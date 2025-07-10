@@ -691,7 +691,8 @@ fn calculate_osd_data_movement(
         }
 
         // Calculate ETA using oldest vs current entry (need at least 3 data points)
-        if movement.missing_objects_history.len() >= 3 {
+        // Only calculate ETA if there are active missing objects being moved
+        if movement.missing_objects_history.len() >= 3 && movement.missing_objects_active > 0 {
             let oldest_missing = movement.missing_objects_history[0];
             let current_missing = movement.missing_objects;
             let time_elapsed = (movement.missing_objects_history.len() - 1) as f64 * interval as f64;
@@ -706,7 +707,8 @@ fn calculate_osd_data_movement(
             }
         }
 
-        if movement.excess_objects_history.len() >= 3 {
+        // Only calculate ETA if there are active excess objects being moved
+        if movement.excess_objects_history.len() >= 3 && movement.excess_objects_active > 0 {
             let oldest_excess = movement.excess_objects_history[0];
             let current_excess = movement.excess_objects;
             let time_elapsed = (movement.excess_objects_history.len() - 1) as f64 * interval as f64;
@@ -855,11 +857,19 @@ fn render_osd_data_movement_table(f: &mut Frame, area: Rect, osd_movements: Hash
         let cells = vec![
             Cell::from(osd_id.to_string()),
             Cell::from(format!("{:>6}", format_number(missing_waiting))),
-            Cell::from(format!("{:>6}", format_number(missing_active))).style(Style::default().add_modifier(Modifier::BOLD)),
+            if missing_active > 0 {
+                Cell::from(format!("{:>6}", format_number(missing_active))).style(Style::default().add_modifier(Modifier::BOLD))
+            } else {
+                Cell::from(format!("{:>6}", format_number(missing_active)))
+            },
             Cell::from(format!("{:>7}", rate_in)),
             Cell::from(format!("{:>9}", time_in)),
             Cell::from(format!("{:>6}", format_number(excess_waiting))),
-            Cell::from(format!("{:>6}", format_number(excess_active))).style(Style::default().add_modifier(Modifier::BOLD)),
+            if excess_active > 0 {
+                Cell::from(format!("{:>6}", format_number(excess_active))).style(Style::default().add_modifier(Modifier::BOLD))
+            } else {
+                Cell::from(format!("{:>6}", format_number(excess_active)))
+            },
             Cell::from(format!("{:>7}", rate_out)),
             Cell::from(format!("{:>9}", time_out)),
         ];
