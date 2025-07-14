@@ -52,12 +52,12 @@ pub async fn run_test(interval: u64) -> Result<()> {
                         file_index = (file_index + 1) % files.len();
                     }
                     Err(e) => {
-                        error_message = Some(format!("Parse error: {}", e));
+                        error_message = Some(format!("Parse error: {e}"));
                     }
                 }
             }
             Err(e) => {
-                error_message = Some(format!("File read error: {}", e));
+                error_message = Some(format!("File read error: {e}"));
             }
         }
         
@@ -165,7 +165,7 @@ async fn fetch_ceph_pg_dump(prefix_args: Option<&[String]>) -> Result<CephPgDump
     };
     
     // Add the ceph command arguments
-    command.args(&["pg", "dump", "--format", "json-pretty"]);
+    command.args(["pg", "dump", "--format", "json-pretty"]);
     
     let output = command.output()?;
     
@@ -238,7 +238,7 @@ fn render_main_ui(
     
     // Calculate PG states height dynamically based on content
     let pg_states_count = count_unique_pg_states(&data.pg_map.pg_stats);
-    let pg_states_height = std::cmp::max(std::cmp::min(pg_states_count + 3, 15), 4) as u16;
+    let pg_states_height = (pg_states_count + 3).clamp(4, 15) as u16;
     
     // Split content area into sections based on whether there are inconsistent PGs
     let (content_layout, osd_layout_index) = if inconsistent_pgs.is_empty() {
@@ -254,7 +254,7 @@ fn render_main_ui(
         (layout, 2)
     } else {
         // Show inconsistent PGs block
-        let inconsistent_pgs_height = std::cmp::max(std::cmp::min(inconsistent_pgs.len() + 3, 15), 4) as u16;
+        let inconsistent_pgs_height = (inconsistent_pgs.len() + 3).clamp(4, 15) as u16;
         let layout = ratatui::layout::Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
             .constraints([

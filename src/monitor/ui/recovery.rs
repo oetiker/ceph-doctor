@@ -107,7 +107,8 @@ pub fn render_recovery_progress(
         let object_rate_display = if object_rate.abs() < 0.01 {
             "0.0/s".to_string()
         } else {
-            format!("{:.1}/s", object_rate.abs())
+            let rate = object_rate.abs();
+            format!("{rate:.1}/s")
         };
         
         let data_rate_display = if data_rate.abs() < 1024.0 {

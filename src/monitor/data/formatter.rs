@@ -10,7 +10,7 @@ pub fn format_number(num: i64) -> String {
 
 pub fn format_time(seconds: u64) -> String {
     if seconds < 60 {
-        format!("{:02}s", seconds)
+        format!("{seconds:02}s")
     } else if seconds < 3600 {
         format!("{}m{:02}s", seconds / 60, seconds % 60)
     } else if seconds < 86400 {
@@ -24,7 +24,7 @@ pub fn format_bytes_per_second(bytes_per_second: f64) -> String {
     let abs_rate = bytes_per_second.abs();
     
     if abs_rate < 1024.0 {
-        format!("{:.0}B/s", bytes_per_second)
+        format!("{bytes_per_second:.0}B/s")
     } else if abs_rate < 1024.0 * 1024.0 {
         format!("{:.1}KB/s", bytes_per_second / 1024.0)
     } else if abs_rate < 1024.0 * 1024.0 * 1024.0 {

@@ -62,10 +62,10 @@ pub fn render_osd_data_movement_table(
         let missing_waiting = movement.missing_objects_waiting;
         let excess_active = movement.excess_objects_active;
         let excess_waiting = movement.excess_objects_waiting;
-        let time_in = movement.incoming_predicted_time_secs.map_or("N/A".to_string(), |t| format_time(t));
-        let time_out = movement.outgoing_predicted_time_secs.map_or("N/A".to_string(), |t| format_time(t));
-        let rate_in = movement.incoming_rate.map_or("N/A".to_string(), |r| format!("{:.1}", r));
-        let rate_out = movement.outgoing_rate.map_or("N/A".to_string(), |r| format!("{:.1}", r));
+        let time_in = movement.incoming_predicted_time_secs.map_or("N/A".to_string(), format_time);
+        let time_out = movement.outgoing_predicted_time_secs.map_or("N/A".to_string(), format_time);
+        let rate_in = movement.incoming_rate.map_or("N/A".to_string(), |r| format!("{r:.1}"));
+        let rate_out = movement.outgoing_rate.map_or("N/A".to_string(), |r| format!("{r:.1}"));
         
         let cells = vec![
             Cell::from(osd_id.to_string()),
@@ -75,16 +75,16 @@ pub fn render_osd_data_movement_table(
             } else {
                 Cell::from(format!("{:>6}", format_number(missing_active)))
             },
-            Cell::from(format!("{:>7}", rate_in)),
-            Cell::from(format!("{:>9}", time_in)),
+            Cell::from(format!("{rate_in:>7}")),
+            Cell::from(format!("{time_in:>9}")),
             Cell::from(format!("{:>6}", format_number(excess_waiting))),
             if excess_active > 0 {
                 Cell::from(format!("{:>6}", format_number(excess_active))).style(Style::default().add_modifier(Modifier::BOLD))
             } else {
                 Cell::from(format!("{:>6}", format_number(excess_active)))
             },
-            Cell::from(format!("{:>7}", rate_out)),
-            Cell::from(format!("{:>9}", time_out)),
+            Cell::from(format!("{rate_out:>7}")),
+            Cell::from(format!("{time_out:>9}")),
         ];
         Row::new(cells)
     });
@@ -147,11 +147,11 @@ pub fn render_inconsistent_pgs_table(
     .height(1);
     
     let rows = sorted_pgs.into_iter().map(|pg| {
-        let rate_str = pg.scrub_rate.map_or("N/A".to_string(), |r| format!("{:.1}", r));
-        let eta_str = pg.eta_seconds.map_or("N/A".to_string(), |t| format_time(t));
+        let rate_str = pg.scrub_rate.map_or("N/A".to_string(), |r| format!("{r:.1}"));
+        let eta_str = pg.eta_seconds.map_or("N/A".to_string(), format_time);
         let scrub_progress = if pg.num_objects > 0 {
             let percentage = (pg.objects_scrubbed as f64 / pg.num_objects as f64) * 100.0;
-            format!("{:.1}%", percentage)
+            format!("{percentage:.1}%")
         } else {
             "0.0%".to_string()
         };

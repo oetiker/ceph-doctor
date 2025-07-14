@@ -24,7 +24,7 @@ pub fn render_pg_states(f: &mut Frame, area: Rect, data: &CephPgDump, use_colors
             let color = if use_colors {
                 match state.as_str() {
                     s if s.contains("inconsistent") || s.contains("incomplete") || s.contains("down") => Color::Red,
-                    s if s == "active+clean" => Color::Green,
+                    "active+clean" => Color::Green,
                     s if s.contains("backfilling") || s.contains("recovery") || s.contains("remapped") => Color::Yellow,
                     _ => Color::Reset,
                 }

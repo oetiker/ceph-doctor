@@ -14,8 +14,8 @@ pub fn render_header(f: &mut Frame, area: Rect, data: &CephPgDump, interval: u64
         .unwrap_or_else(|_| now.into())
         .format("%Y-%m-%d %H:%M:%S UTC");
     
-    let title = format!("CEPH DOCTOR - Cluster Monitor ({}s interval)", interval);
-    let subtitle = format!("Last Update: {}", timestamp);
+    let title = format!("CEPH DOCTOR - Cluster Monitor ({interval}s interval)");
+    let subtitle = format!("Last Update: {timestamp}");
     
     let header_block = Block::default()
         .borders(Borders::ALL)

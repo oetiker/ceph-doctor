@@ -24,7 +24,7 @@ impl MonitorState {
     }
     
     pub fn get_recovery_history_mut(&mut self, category: &str) -> &mut Vec<RecoveryData> {
-        self.recovery_history.entry(category.to_string()).or_insert_with(Vec::new)
+        self.recovery_history.entry(category.to_string()).or_default()
     }
     
     pub fn add_recovery_data(&mut self, category: &str, data: RecoveryData, max_history: usize) {
