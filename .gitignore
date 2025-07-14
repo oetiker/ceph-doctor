@@ -1,6 +1,6 @@
-*
-!src
-!.gitignore
-!Cargo*
-!*.md
-!*.toml
+/*
+!/src
+!/.gitignore
+!/Cargo*
+!/*.md
+!/*.toml
