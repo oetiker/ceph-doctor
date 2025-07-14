@@ -355,23 +355,18 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo registry
+      - name: Cache cargo registry and target
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-linux-cross-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-linux-cross-
+            ${{ runner.os }}-cargo-
 
       - name: Build and Package All Platforms
         id: build_package
@@ -387,14 +382,10 @@ jobs:
           # Track built artifacts for summary
           BUILT_ARTIFACTS=()
 
-          # Define target platforms with their archive formats
+          # Define target platforms with their archive formats (Linux focus)
           declare -A targets=(
             ["x86_64-unknown-linux-gnu"]="tar.gz"
             ["aarch64-unknown-linux-gnu"]="tar.gz"
-            ["x86_64-pc-windows-msvc"]="zip"
-            ["aarch64-pc-windows-msvc"]="zip"
-            ["x86_64-apple-darwin"]="zip"
-            ["aarch64-apple-darwin"]="zip"
           )
 
           # Add build info to job summary
@@ -403,16 +394,13 @@ jobs:
           echo "- **Platforms:** ${!targets[@]}" >> $GITHUB_STEP_SUMMARY
           echo "- **Building artifacts for:**" >> $GITHUB_STEP_SUMMARY
 
-          # Install cross-compilation dependencies
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          # Install cross-compilation tool (easier than manual setup)
+          cargo install cross
 
           for target in "${!targets[@]}"; do
             ARCHIVE_TYPE=${targets[$target]}
             EXTENSION=""
-            if [[ "$target" == *"windows"* ]]; then
-              EXTENSION=".exe"
-            fi
+            # No Windows extension needed for Linux builds
 
             echo "::group::Building for $target"
             echo "- $target ($ARCHIVE_TYPE)" >> $GITHUB_STEP_SUMMARY
@@ -428,11 +416,12 @@ jobs:
             # Get version without the 'v' prefix for the build
             VERSION_NO_V=${VERSION#v}
 
-            # Set up cross-compilation environment
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
-
-            # Build directly into the temp dir with version information
-            cargo build --release --target $target
+            # Build using cross for ARM64, regular cargo for x86_64
+            if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
+              cross build --release --target $target
+            else
+              cargo build --release --target $target
+            fi
             cp target/$target/release/${{ env.PROJECT_NAME }}$EXTENSION "$TEMP_BUILD_DIR/$BINARY_NAME"
 
             # Prepare package contents within the temp dir

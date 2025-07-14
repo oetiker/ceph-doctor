@@ -133,6 +133,27 @@ Test the monitor interface locally:
 cargo run -- monitor --test
 ```
 
+### Cross-compilation
+
+The project supports cross-compilation for Linux AMD64 and ARM64.
+
+```bash
+# Install cross tool
+cargo install cross
+
+# Build for ARM64
+cross build --release --target aarch64-unknown-linux-gnu
+
+# Build for AMD64 (native)
+cargo build --release --target x86_64-unknown-linux-gnu
+```
+
+The release builds are optimized with:
+- Link Time Optimization (LTO)
+- Symbol stripping
+- Single codegen unit
+- Panic=abort for smaller binaries
+
 ### Contributing
 
 1. Fork the repository
