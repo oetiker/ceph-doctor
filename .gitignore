@@ -1,6 +1,8 @@
 /*
 !/src
+!/.github
 !/.gitignore
 !/Cargo*
 !/*.md
 !/*.toml
+*~

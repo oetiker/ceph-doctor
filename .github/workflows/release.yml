@@ -1,0 +1,587 @@
+name: Build and Release
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'bugfix'
+        type: choice
+        options:
+          - bugfix   # Increment patch (x.y.Z)
+          - feature  # Increment minor (x.Y.0)
+          - major    # Increment major (X.0.0)
+
+env:
+  PROJECT_NAME: ceph-doctor
+
+permissions:
+  contents: write
+
+jobs:
+  # Check if we're on the main branch
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check branch
+        run: |
+          echo "::group::Branch verification"
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          if [[ "$CURRENT_BRANCH" != "main" ]]; then
+            echo "::error title=Wrong Branch::Release can only be run from the main branch. Current branch: $CURRENT_BRANCH"
+            echo "::notice::Please switch to the main branch and try again."
+            echo "Release attempted from non-main branch: $CURRENT_BRANCH" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "::notice title=Branch Check Passed::Running on main branch, proceeding with release."
+          echo "✅ Branch verification passed - running on main branch" >> $GITHUB_STEP_SUMMARY
+          echo "::endgroup::"
+
+  # Check if tests have passed for this commit
+  verify-tests:
+    runs-on: ubuntu-latest
+    needs: check-branch
+    steps:
+      - name: Check test status
+        id: test-status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const commitSha = context.sha;
+
+            console.log(`::group::Test verification`);
+            console.log(`Checking test status for commit: ${commitSha}`);
+
+            // Get workflow runs for the tests workflow
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'tests.yml',
+              branch: 'main',
+              status: 'completed',
+              per_page: 10
+            });
+
+            // Find the most recent run for this commit
+            const run = runs.data.workflow_runs.find(run => run.head_sha === commitSha);
+
+            if (!run) {
+              console.log('No test runs found for this commit.');
+              // Check if there's a run in progress
+              const inProgressRuns = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'tests.yml',
+                branch: 'main',
+                status: 'in_progress',
+                per_page: 10
+              });
+
+              const inProgressRun = inProgressRuns.data.workflow_runs.find(run => run.head_sha === commitSha);
+
+              if (inProgressRun) {
+                console.log('::notice title=Tests Running::Tests are currently running for this commit. Will wait up to 2 minutes for completion...');
+
+                // Implement a polling mechanism to wait for tests to complete
+                const runId = inProgressRun.id;
+                const maxWaitTimeMs = 2 * 60 * 1000; // 2 minutes in milliseconds
+                const checkIntervalMs = 5000; // Check every 5 seconds
+                const startTime = Date.now();
+
+                while (Date.now() - startTime < maxWaitTimeMs) {
+                  // Wait for checkIntervalMs milliseconds
+                  await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
+
+                  // Check current status of the run
+                  const checkRun = await github.rest.actions.getWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: runId
+                  });
+
+                  console.log(`Test run status after ${Math.floor((Date.now() - startTime) / 1000)}s: ${checkRun.data.status}, conclusion: ${checkRun.data.conclusion}`);
+
+                  // If the run is complete, check its conclusion
+                  if (checkRun.data.status === 'completed') {
+                    if (checkRun.data.conclusion === 'success') {
+                      console.log('::notice title=Tests Passed::Tests completed successfully while waiting!');
+                      await core.summary
+                        .addHeading('Tests Verification')
+                        .addRaw('✅ Tests completed successfully while waiting')
+                        .addLink('View test run', checkRun.data.html_url)
+                        .write();
+                      console.log('::endgroup::');
+                      return; // Success - continue with the release
+                    } else {
+                      console.log('::endgroup::');
+                      await core.summary
+                        .addHeading('Tests Failed')
+                        .addRaw(`❌ Tests completed with status: ${checkRun.data.conclusion}`)
+                        .addLink('View failed tests', checkRun.data.html_url)
+                        .write();
+                      return core.setFailed(`Tests completed with status: ${checkRun.data.conclusion}. Please fix the failing tests before releasing.`);
+                    }
+                  }
+                }
+
+                // If we get here, we've timed out waiting
+                console.log('::endgroup::');
+                await core.summary
+                  .addHeading('Tests Timeout')
+                  .addRaw('⚠️ Timed out waiting for tests to complete')
+                  .addLink('View test run', inProgressRun.html_url)
+                  .write();
+                return core.setFailed('Timed out waiting for tests to complete. Try again in a minute or check if tests are stuck.');
+              }
+
+              // No completed runs and no in-progress runs
+              console.log('::endgroup::');
+              await core.summary
+                .addHeading('Tests Missing')
+                .addRaw('❌ No test runs found for this commit')
+                .write();
+              return core.setFailed('No test runs found for this commit. Please run tests before releasing.');
+            }
+
+            // Check if the tests passed
+            if (run.conclusion === 'success') {
+              console.log('::notice title=Tests Passed::Tests passed! Proceeding with release.');
+              await core.summary
+                .addHeading('Tests Verification')
+                .addRaw('✅ Tests passed - proceeding with release')
+                .addLink('View successful tests', run.html_url)
+                .write();
+              console.log('::endgroup::');
+              return;
+            } else {
+              console.log(`Tests failed with conclusion: ${run.conclusion}`);
+              console.log('::endgroup::');
+              await core.summary
+                .addHeading('Tests Failed')
+                .addRaw(`❌ Tests failed with conclusion: ${run.conclusion}`)
+                .addLink('View failed tests', run.html_url)
+                .write();
+              return core.setFailed(`Tests failed for this commit with conclusion: ${run.conclusion}. Please fix the failing tests before releasing.`);
+            }
+
+  create-tag:
+    runs-on: ubuntu-latest
+    needs: verify-tests
+    outputs:
+      version: ${{ steps.generate_version.outputs.version }}
+      version_no_v: ${{ steps.generate_version.outputs.version_no_v }}
+      release_date: ${{ steps.generate_version.outputs.release_date }}
+    steps:
+      - name: Checkout code with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate new version
+        id: generate_version
+        run: |
+          set -euo pipefail
+          echo "::group::Version generation"
+          # Get the latest tag from git
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # Parse the latest tag to get major, minor, and patch
+          MAJOR=$(echo $LATEST_TAG | sed -E 's/v([0-9]+)\.([0-9]+)\.([0-9]+).*/\1/')
+          MINOR=$(echo $LATEST_TAG | sed -E 's/v([0-9]+)\.([0-9]+)\.([0-9]+).*/\2/')
+          PATCH=$(echo $LATEST_TAG | sed -E 's/v([0-9]+)\.([0-9]+)\.([0-9]+).*/\3/')
+
+          echo "Current version: $MAJOR.$MINOR.$PATCH"
+
+          # Increment based on release type
+          case "${{ github.event.inputs.release_type }}" in
+            major)
+              MAJOR=$((MAJOR+1))
+              MINOR=0
+              PATCH=0
+              ;;
+            feature)
+              MINOR=$((MINOR+1))
+              PATCH=0
+              ;;
+            bugfix)
+              PATCH=$((PATCH+1))
+              ;;
+          esac
+
+          # Generate new version
+          NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+          echo "::notice title=New Version::New version will be: $NEW_VERSION (from $LATEST_TAG)"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Also create a version without the v prefix for CHANGES.md
+          echo "version_no_v=$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
+
+          # Get current date in YYYY-MM-DD format
+          RELEASE_DATE=$(date +%Y-%m-%d)
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+
+          # Add version info to job summary
+          echo "## Version Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous version:** $LATEST_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "- **New version:** $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release type:** ${{ github.event.inputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release date:** $RELEASE_DATE" >> $GITHUB_STEP_SUMMARY
+
+          echo "::endgroup::"
+
+      - name: Update CHANGES.md and Cargo.toml
+        env:
+          VERSION_NO_V: ${{ steps.generate_version.outputs.version_no_v }}
+          RELEASE_DATE: ${{ steps.generate_version.outputs.release_date }}
+        run: |
+          set -euo pipefail
+          echo "::group::Updating CHANGES.md and Cargo.toml"
+
+          # Update Cargo.toml version
+          sed -i "s/^version = \".*\"/version = \"${VERSION_NO_V}\"/" Cargo.toml
+          echo "Updated Cargo.toml version to ${VERSION_NO_V}"
+
+          # Use Perl to update CHANGES.md
+          perl -i -e '
+            use strict;
+            use warnings;
+
+            # Read the file content
+            my $content = do { local $/; <> };
+
+            # Extract the Unreleased section
+            my ($before, $unreleased_section, $after) =
+              $content =~ /^(.*?)(## \[Unreleased\].*?)(?=^## \d|\Z)(.*)/ms;
+
+            # Initialize variables for sections
+            my $has_new = 0;
+            my $has_changed = 0;
+            my $has_fixed = 0;
+            my $new_content = "";
+            my $changed_content = "";
+            my $fixed_content = "";
+
+            # Extract content for each section if it exists
+            if ($unreleased_section =~ /### New(.*?)(?=^###|\Z)/ms) {
+              my $section = $1;
+              $section =~ s/^\s+|\s+$//g;
+              if ($section) {
+                $has_new = 1;
+                $new_content = $section;
+              }
+            }
+
+            if ($unreleased_section =~ /### Changed(.*?)(?=^###|\Z)/ms) {
+              my $section = $1;
+              $section =~ s/^\s+|\s+$//g;
+              if ($section) {
+                $has_changed = 1;
+                $changed_content = $section;
+              }
+            }
+
+            if ($unreleased_section =~ /### Fixed(.*?)(?=^###|\Z)/ms) {
+              my $section = $1;
+              $section =~ s/^\s+|\s+$//g;
+              if ($section) {
+                $has_fixed = 1;
+                $fixed_content = $section;
+              }
+            }
+
+            # Build new Unreleased section
+            my $new_unreleased = "## [Unreleased]\n\n".
+            "### New\n\n### Changed\n\n### Fixed\n\n";
+
+            # Build version section with only non-empty sections
+            my $version_section = "## $ENV{VERSION_NO_V} - $ENV{RELEASE_DATE}\n";
+            if ($has_new) {
+              $version_section .= "### New\n$new_content\n\n";
+            }
+            if ($has_changed) {
+              $version_section .= "### Changed\n$changed_content\n\n";
+            }
+            if ($has_fixed) {
+              $version_section .= "### Fixed\n$fixed_content\n\n";
+            }
+
+            # Put it all together
+            print $before . $new_unreleased . $version_section . $after;
+          ' CHANGES.md
+
+          echo "Updated CHANGES.md for version ${VERSION_NO_V}"
+          echo "::endgroup::"
+
+      - name: Commit and Create tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "::group::Creating tag and pushing changes"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          VERSION="${{ steps.generate_version.outputs.version }}"
+
+          # Commit CHANGES.md and Cargo.toml updates
+          git add CHANGES.md Cargo.toml
+          git commit -m "Update CHANGES.md and Cargo.toml for release ${VERSION}"
+          echo "::notice title=Commit Created::Created commit with CHANGES.md updates"
+
+          # Create and push tag
+          git tag -a ${VERSION} -m "Release ${VERSION}"
+          echo "::notice title=Tag Created::Created tag ${VERSION}"
+
+          git push origin main
+          git push origin ${VERSION}
+          echo "::notice title=Changes Pushed::Pushed changes and tag to repository"
+          echo "::endgroup::"
+
+  build:
+    needs: create-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-tag.outputs.version }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build and Package All Platforms
+        id: build_package
+        env:
+          VERSION: ${{ needs.create-tag.outputs.version }}
+          VERSION_NO_V: ${{ needs.create-tag.outputs.version_no_v }}
+        run: |
+          set -euxo pipefail
+          echo "::group::Building and packaging"
+          ARCHIVES_DIR="release-archives"
+          mkdir -p "$ARCHIVES_DIR"
+
+          # Track built artifacts for summary
+          BUILT_ARTIFACTS=()
+
+          # Define target platforms with their archive formats
+          declare -A targets=(
+            ["x86_64-unknown-linux-gnu"]="tar.gz"
+            ["aarch64-unknown-linux-gnu"]="tar.gz"
+            ["x86_64-pc-windows-msvc"]="zip"
+            ["aarch64-pc-windows-msvc"]="zip"
+            ["x86_64-apple-darwin"]="zip"
+            ["aarch64-apple-darwin"]="zip"
+          )
+
+          # Add build info to job summary
+          echo "## Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms:** ${!targets[@]}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Building artifacts for:**" >> $GITHUB_STEP_SUMMARY
+
+          # Install cross-compilation dependencies
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+          for target in "${!targets[@]}"; do
+            ARCHIVE_TYPE=${targets[$target]}
+            EXTENSION=""
+            if [[ "$target" == *"windows"* ]]; then
+              EXTENSION=".exe"
+            fi
+
+            echo "::group::Building for $target"
+            echo "- $target ($ARCHIVE_TYPE)" >> $GITHUB_STEP_SUMMARY
+
+            # Add target if not already installed
+            rustup target add $target
+
+            # Create a temporary dir for each build to avoid conflicts
+            TEMP_BUILD_DIR="build_temp_${target}"
+            mkdir -p "$TEMP_BUILD_DIR"
+            BINARY_NAME="${{ env.PROJECT_NAME }}${EXTENSION}"
+
+            # Get version without the 'v' prefix for the build
+            VERSION_NO_V=${VERSION#v}
+
+            # Set up cross-compilation environment
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+
+            # Build directly into the temp dir with version information
+            cargo build --release --target $target
+            cp target/$target/release/${{ env.PROJECT_NAME }}$EXTENSION "$TEMP_BUILD_DIR/$BINARY_NAME"
+
+            # Prepare package contents within the temp dir
+            PKGDIR_BASE="${{ env.PROJECT_NAME }}-${VERSION_NO_V}-${target}"
+            PKGDIR_CONTENTS="$TEMP_BUILD_DIR/$PKGDIR_BASE"
+            mkdir -p "$PKGDIR_CONTENTS"
+            mv "$TEMP_BUILD_DIR/$BINARY_NAME" "$PKGDIR_CONTENTS/" # Move the built binary
+            cp README.md "$PKGDIR_CONTENTS/"
+            cp CHANGES.md "$PKGDIR_CONTENTS/"
+            [ -f LICENSE ] && cp LICENSE "$PKGDIR_CONTENTS/"
+
+            # Create archive from the temp dir, placing it in ARCHIVES_DIR
+            ARCHIVE_NAME="$PKGDIR_BASE.$ARCHIVE_TYPE"
+            # Make sure the archives directory exists (might be removed when cd'ing)
+            mkdir -p "$ARCHIVES_DIR"
+
+            # Save the current working directory
+            CURRENT_DIR=$(pwd)
+
+            # Change to temp build directory for archiving
+            cd "$TEMP_BUILD_DIR"
+            if [ "$ARCHIVE_TYPE" = "zip" ]; then
+              # Create parent directory structure if it doesn't exist
+              mkdir -p "$(dirname "$CURRENT_DIR/$ARCHIVES_DIR/$ARCHIVE_NAME")"
+              zip -r "$CURRENT_DIR/$ARCHIVES_DIR/$ARCHIVE_NAME" "$PKGDIR_BASE"
+            else
+              # Create parent directory structure if it doesn't exist
+              mkdir -p "$(dirname "$CURRENT_DIR/$ARCHIVES_DIR/$ARCHIVE_NAME")"
+              tar -czvf "$CURRENT_DIR/$ARCHIVES_DIR/$ARCHIVE_NAME" "$PKGDIR_BASE"
+            fi
+
+            # Return to original directory
+            cd "$CURRENT_DIR"
+
+            # Track built artifact
+            BUILT_ARTIFACTS+=("$ARCHIVE_NAME")
+
+            # Clean up temp build dir for this platform
+            rm -rf "$TEMP_BUILD_DIR"
+            echo "::endgroup::"
+          done
+
+          echo "::notice title=Build Complete::All builds and packages complete"
+          echo "Generated archives in $ARCHIVES_DIR:"
+          ls -l "$ARCHIVES_DIR"
+
+          # Add generated artifacts to summary
+          echo "## Generated Archives" >> $GITHUB_STEP_SUMMARY
+          for artifact in "${BUILT_ARTIFACTS[@]}"; do
+            echo "- $artifact" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "::endgroup::"
+
+      - name: Upload all release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts # Upload all archives under this single artifact name
+          path: release-archives # Path to the directory containing all archives
+
+  create-release:
+    needs: [build, create-tag]  # Add explicit dependency on create-tag to access its outputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code for release notes
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-tag.outputs.version }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts # Name of the artifact to download
+          path: release-archives/ # Path to download the artifact to
+
+      - name: List artifacts
+        run: |
+          echo "::group::Listing artifacts"
+          echo "Files in release-archives directory:"
+          find release-archives -type f | sort
+          echo "Making sure all files are accessible:"
+          ls -la release-archives/
+          echo "::endgroup::"
+
+      - name: Extract release notes
+        id: extract_release_notes
+        run: |
+          set -e
+          echo "::group::Extracting release notes"
+
+          # Extract version number without 'v' prefix for CHANGES.md
+          VERSION_NO_V=$(echo "${{ needs.create-tag.outputs.version }}" | sed 's/^v//')
+          echo "Looking for version: ${VERSION_NO_V}"
+
+          # Use Perl to extract the relevant section - much more reliable than bash/awk
+          perl -e '
+            # Get version from first argument
+            my $version = $ARGV[0];
+
+            # Read the entire CHANGES.md file
+            undef $/;
+            my $content = <STDIN>;
+
+            # Use a regex to find the section for our version
+            if ($content =~ /## \Q$version\E[^\n]*\n(.*?)(?=\n## [0-9]|$)/s) {
+              my $section = $1;
+              # Trim leading/trailing whitespace
+              $section =~ s/^\s+|\s+$//g;
+              print $section;
+            } else {
+              # Not found, create minimal content
+              print "Release version $version\n";
+              warn "WARNING: Could not find version $version in CHANGES.md\n";
+            }
+          ' "$VERSION_NO_V" < CHANGES.md > release_notes_final.md
+
+          # Show the result
+          echo "Release notes extracted to release_notes_final.md:"
+          cat release_notes_final.md
+          echo "::endgroup::"
+
+      - name: Set version without v prefix
+        id: set_version_without_v
+        run: |
+          TAG=${{ needs.create-tag.outputs.version }}
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-tag.outputs.version }}
+          name: Release ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          body_path: release_notes_final.md
+          fail_on_unmatched_files: true
+          files: release-archives/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate release summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.create-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Date:** ${{ needs.create-tag.outputs.release_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL:** ${{ steps.create_release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Release Notes" >> $GITHUB_STEP_SUMMARY
+          cat release_notes_final.md >> $GITHUB_STEP_SUMMARY
+
+#END

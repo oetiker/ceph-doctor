@@ -1,0 +1,220 @@
+name: Rust Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache target directory
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run tests
+      id: tests
+      run: |
+        echo "::group::Running tests"
+        echo "::notice title=Running Tests::Starting Rust tests"
+        
+        # Run tests with JSON output for parsing
+        cargo test --message-format json > test-results.json 2>&1
+        TEST_EXIT_CODE=$?
+        
+        # Parse test results
+        SUCCESS_COUNT=$(grep -c '"type":"test".*"event":"ok"' test-results.json || true)
+        FAIL_COUNT=$(grep -c '"type":"test".*"event":"failed"' test-results.json || true)
+        IGNORE_COUNT=$(grep -c '"type":"test".*"event":"ignored"' test-results.json || true)
+
+        # Add test summary to job summary
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Passed: $SUCCESS_COUNT" >> $GITHUB_STEP_SUMMARY
+        echo "- ❌ Failed: $FAIL_COUNT" >> $GITHUB_STEP_SUMMARY
+        echo "- ⏭️ Ignored: $IGNORE_COUNT" >> $GITHUB_STEP_SUMMARY
+
+        # If tests failed, extract and display failure details
+        if [ $FAIL_COUNT -gt 0 ]; then
+          echo "### Failed Tests" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep '"type":"test".*"event":"failed"' test-results.json | jq -r '.name + ": " + .stdout' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Create annotations for failed tests
+          grep '"type":"test".*"event":"failed"' test-results.json | while read -r line; do
+            TEST_NAME=$(echo $line | jq -r '.name')
+            OUTPUT=$(echo $line | jq -r '.stdout // empty')
+            echo "::error title=Test Failed::Test: $TEST_NAME, Output: $OUTPUT"
+          done
+        fi
+
+        echo "::endgroup::"
+        exit $TEST_EXIT_CODE
+
+    - name: Generate coverage report
+      id: coverage
+      run: |
+        echo "::group::Generating coverage report"
+        echo "::notice title=Coverage::Generating test coverage report"
+
+        # Install cargo-llvm-cov if not present
+        cargo install cargo-llvm-cov
+
+        # Run coverage
+        cargo llvm-cov --lcov --output-path coverage.lcov
+        COVERAGE_EXIT_CODE=$?
+
+        # Generate coverage percentage
+        COVERAGE_PERCENTAGE=$(cargo llvm-cov --summary-only | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//')
+
+        # Store coverage for later steps
+        echo "COVERAGE_PERCENTAGE=$COVERAGE_PERCENTAGE" >> $GITHUB_ENV
+        echo "coverage_percentage=$COVERAGE_PERCENTAGE" >> $GITHUB_OUTPUT
+
+        # Generate HTML coverage report
+        cargo llvm-cov --html --output-dir coverage-html
+
+        echo "::notice title=Coverage::Current coverage: ${COVERAGE_PERCENTAGE}%"
+        echo "::endgroup::"
+
+        exit $COVERAGE_EXIT_CODE
+
+    - name: Check coverage threshold
+      id: coverage-check
+      run: |
+        echo "::group::Checking coverage threshold"
+
+        # Set minimum coverage threshold (can be adjusted)
+        MIN_COVERAGE=60.0
+        CURRENT_COVERAGE=${{ steps.coverage.outputs.coverage_percentage }}
+
+        # Use awk for floating point comparison
+        COVERAGE_PASSED=$(awk "BEGIN { print ($CURRENT_COVERAGE >= $MIN_COVERAGE) }")
+
+        echo "Current coverage: ${CURRENT_COVERAGE}%"
+        echo "Minimum threshold: ${MIN_COVERAGE}%"
+
+        if [ "$COVERAGE_PASSED" = "0" ]; then
+          echo "::error title=Coverage Threshold::❌ Coverage ${CURRENT_COVERAGE}% is below minimum threshold of ${MIN_COVERAGE}%"
+          echo "COVERAGE_PASSED=false" >> $GITHUB_ENV
+          exit 1
+        else
+          echo "::notice title=Coverage Threshold::✅ Coverage ${CURRENT_COVERAGE}% meets minimum threshold of ${MIN_COVERAGE}%"
+          echo "COVERAGE_PASSED=true" >> $GITHUB_ENV
+        fi
+
+        echo "::endgroup::"
+
+    - name: Comment coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        COVERAGE_PERCENTAGE: ${{ steps.coverage.outputs.coverage_percentage }}
+        COVERAGE_PASSED: ${{ env.COVERAGE_PASSED }}
+      with:
+        script: |
+          const coverage = process.env.COVERAGE_PERCENTAGE;
+          const coveragePassed = process.env.COVERAGE_PASSED === 'true';
+          const emoji = coveragePassed ? '✅' : '❌';
+          const status = coveragePassed ? 'PASSED' : 'FAILED';
+
+          const body = `## ${emoji} Test Coverage Report
+
+          **Current Coverage:** ${coverage}%
+          **Threshold Status:** ${status}
+          **Minimum Threshold:** 60.0%
+
+          ${coveragePassed ?
+            '🎉 Great job! Coverage meets the minimum threshold.' :
+            '⚠️ Coverage is below the minimum threshold. Please add more tests.'}
+          `;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: |
+          coverage.lcov
+          coverage-html/
+        retention-days: 30
+
+    - name: Run linter (clippy)
+      run: |
+        echo "::group::Running clippy"
+        cargo clippy --all-targets --all-features -- -D warnings
+        echo "::endgroup::"
+
+    - name: Check formatting
+      run: |
+        echo "::group::Checking code formatting"
+        cargo fmt --all -- --check
+        echo "::endgroup::"
+
+    - name: Generate test summary
+      if: always()
+      run: |
+        echo "## Overall Test Summary" >> $GITHUB_STEP_SUMMARY
+
+        if [ -f test-results.json ]; then
+          TOTAL_TESTS=$(grep -c '"type":"test".*"event":"ok"' test-results.json || true)
+          TOTAL_FAILED=$(grep -c '"type":"test".*"event":"failed"' test-results.json || true)
+          TOTAL_IGNORED=$(grep -c '"type":"test".*"event":"ignored"' test-results.json || true)
+
+          echo "- Total tests: $TOTAL_TESTS" >> $GITHUB_STEP_SUMMARY
+          echo "- Total failed: $TOTAL_FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Total ignored: $TOTAL_IGNORED" >> $GITHUB_STEP_SUMMARY
+
+          if [ $TOTAL_FAILED -eq 0 ]; then
+            echo "::notice title=Tests Summary::✅ All tests passed: $TOTAL_TESTS tests run, $TOTAL_IGNORED ignored"
+          else
+            echo "::error title=Tests Summary::❌ Some tests failed: $TOTAL_FAILED failed out of $TOTAL_TESTS tests"
+          fi
+        else
+          echo "Test result files not found. Unable to generate summary." >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Add coverage to summary
+        if [ -n "$COVERAGE_PERCENTAGE" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- **Coverage:** ${COVERAGE_PERCENTAGE}%" >> $GITHUB_STEP_SUMMARY
+          echo "- **Threshold:** 60.0%" >> $GITHUB_STEP_SUMMARY
+          if [ "$COVERAGE_PASSED" = "true" ]; then
+            echo "- **Status:** ✅ PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status:** ❌ FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
