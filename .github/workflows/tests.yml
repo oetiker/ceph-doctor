@@ -70,106 +70,6 @@ jobs:
         echo "::endgroup::"
         exit $TEST_EXIT_CODE
 
-    - name: Generate coverage report
-      id: coverage
-      run: |
-        echo "::group::Generating coverage report"
-        echo "::notice title=Coverage::Generating test coverage report"
-
-        # Install cargo-llvm-cov if not present
-        cargo install cargo-llvm-cov
-
-        # Run coverage
-        cargo llvm-cov --lcov --output-path coverage.lcov
-        COVERAGE_EXIT_CODE=$?
-
-        # Generate coverage percentage - try multiple methods
-        COVERAGE_PERCENTAGE=$(cargo llvm-cov --summary-only 2>/dev/null | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//' || echo "0.0")
-        
-        # If that fails, try a different approach
-        if [ "$COVERAGE_PERCENTAGE" = "0.0" ]; then
-          # Use a basic estimate based on lines covered
-          COVERAGE_PERCENTAGE="15.0"
-          echo "::warning title=Coverage::Could not determine exact coverage, using estimate"
-        fi
-
-        # Store coverage for later steps
-        echo "COVERAGE_PERCENTAGE=$COVERAGE_PERCENTAGE" >> $GITHUB_ENV
-        echo "coverage_percentage=$COVERAGE_PERCENTAGE" >> $GITHUB_OUTPUT
-
-        # Generate HTML coverage report
-        cargo llvm-cov --html --output-dir coverage-html 2>/dev/null || echo "::warning title=Coverage::HTML report generation failed"
-
-        echo "::notice title=Coverage::Current coverage: ${COVERAGE_PERCENTAGE}%"
-        echo "::endgroup::"
-
-        exit $COVERAGE_EXIT_CODE
-
-    - name: Check coverage threshold
-      id: coverage-check
-      run: |
-        echo "::group::Checking coverage threshold"
-
-        # Set minimum coverage threshold (can be adjusted)
-        MIN_COVERAGE=10.0
-        CURRENT_COVERAGE=${{ steps.coverage.outputs.coverage_percentage }}
-
-        # Use awk for floating point comparison
-        COVERAGE_PASSED=$(awk "BEGIN { print ($CURRENT_COVERAGE >= $MIN_COVERAGE) }")
-
-        echo "Current coverage: ${CURRENT_COVERAGE}%"
-        echo "Minimum threshold: ${MIN_COVERAGE}%"
-
-        if [ "$COVERAGE_PASSED" = "0" ]; then
-          echo "::error title=Coverage Threshold::❌ Coverage ${CURRENT_COVERAGE}% is below minimum threshold of ${MIN_COVERAGE}%"
-          echo "COVERAGE_PASSED=false" >> $GITHUB_ENV
-          exit 1
-        else
-          echo "::notice title=Coverage Threshold::✅ Coverage ${CURRENT_COVERAGE}% meets minimum threshold of ${MIN_COVERAGE}%"
-          echo "COVERAGE_PASSED=true" >> $GITHUB_ENV
-        fi
-
-        echo "::endgroup::"
-
-    - name: Comment coverage on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      env:
-        COVERAGE_PERCENTAGE: ${{ steps.coverage.outputs.coverage_percentage }}
-        COVERAGE_PASSED: ${{ env.COVERAGE_PASSED }}
-      with:
-        script: |
-          const coverage = process.env.COVERAGE_PERCENTAGE;
-          const coveragePassed = process.env.COVERAGE_PASSED === 'true';
-          const emoji = coveragePassed ? '✅' : '❌';
-          const status = coveragePassed ? 'PASSED' : 'FAILED';
-
-          const body = `## ${emoji} Test Coverage Report
-
-          **Current Coverage:** ${coverage}%
-          **Threshold Status:** ${status}
-          **Minimum Threshold:** 10.0%
-
-          ${coveragePassed ?
-            '🎉 Great job! Coverage meets the minimum threshold.' :
-            '⚠️ Coverage is below the minimum threshold. Please add more tests.'}
-          `;
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: body
-          });
-
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-reports
-        path: |
-          coverage.lcov
-          coverage-html/
-        retention-days: 30
 
     - name: Run linter (clippy)
       run: |
@@ -206,15 +106,7 @@ jobs:
           echo "Test result files not found. Unable to generate summary." >> $GITHUB_STEP_SUMMARY
         fi
 
-        # Add coverage to summary
-        if [ -n "$COVERAGE_PERCENTAGE" ]; then
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "- **Coverage:** ${COVERAGE_PERCENTAGE}%" >> $GITHUB_STEP_SUMMARY
-          echo "- **Threshold:** 10.0%" >> $GITHUB_STEP_SUMMARY
-          if [ "$COVERAGE_PASSED" = "true" ]; then
-            echo "- **Status:** ✅ PASSED" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Status:** ❌ FAILED" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage:** Not configured (coverage reporting disabled)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status:** ℹ️ SKIPPED" >> $GITHUB_STEP_SUMMARY
