@@ -1,6 +1,9 @@
 use crate::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::{execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}};
+use crossterm::{
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::Duration;
@@ -16,47 +19,46 @@ impl TerminalManager {
         execute!(stdout, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
-        
+
         Ok(TerminalManager { terminal })
     }
-    
+
     pub fn terminal(&mut self) -> &mut Terminal<CrosstermBackend<io::Stdout>> {
         &mut self.terminal
     }
-    
+
     pub fn cleanup(&mut self) -> Result<()> {
         disable_raw_mode()?;
         execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
         Ok(())
     }
-    
+
     pub fn poll_event(&self, timeout: Duration) -> Result<bool> {
         Ok(event::poll(timeout)?)
     }
-    
+
     pub fn read_event(&self) -> Result<Event> {
         Ok(event::read()?)
     }
-    
+
     pub fn should_quit(&self, event: &Event) -> bool {
         match event {
             Event::Key(key) => self.is_quit_key(key),
             _ => false,
         }
     }
-    
+
     pub fn is_quit_key(&self, key: &KeyEvent) -> bool {
-        matches!(key,
+        matches!(
+            key,
             KeyEvent {
                 code: KeyCode::Char('c'),
                 modifiers: KeyModifiers::CONTROL,
                 ..
-            }
-            | KeyEvent {
+            } | KeyEvent {
                 code: KeyCode::Char('q'),
                 ..
-            }
-            | KeyEvent {
+            } | KeyEvent {
                 code: KeyCode::Esc,
                 ..
             }
@@ -73,14 +75,13 @@ impl Drop for TerminalManager {
 pub async fn sleep_with_event_check(
     duration_secs: u64,
     terminal_manager: &TerminalManager,
-) -> Result<SleepResult>
-{
+) -> Result<SleepResult> {
     let mut remaining_time = duration_secs as f32;
     while remaining_time > 0.0 {
         let sleep_duration = remaining_time.min(0.25);
         tokio::time::sleep(Duration::from_secs_f32(sleep_duration)).await;
         remaining_time -= sleep_duration;
-        
+
         if terminal_manager.poll_event(Duration::from_millis(0))? {
             let event = terminal_manager.read_event()?;
             if terminal_manager.should_quit(&event) {

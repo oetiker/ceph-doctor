@@ -297,16 +297,16 @@ pub mod common {
         pub outgoing_objects: i64,
         pub missing_objects: i64,
         pub excess_objects: i64,
-        pub missing_objects_waiting: i64,  // Objects waiting to be moved (backfill_wait)
-        pub excess_objects_waiting: i64,   // Objects waiting to be moved (backfill_wait)
-        pub missing_objects_active: i64,   // Objects actively being moved (backfilling)
-        pub excess_objects_active: i64,    // Objects actively being moved (backfilling)
+        pub missing_objects_waiting: i64, // Objects waiting to be moved (backfill_wait)
+        pub excess_objects_waiting: i64,  // Objects waiting to be moved (backfill_wait)
+        pub missing_objects_active: i64,  // Objects actively being moved (backfilling)
+        pub excess_objects_active: i64,   // Objects actively being moved (backfilling)
         pub incoming_predicted_time_secs: Option<u64>,
         pub outgoing_predicted_time_secs: Option<u64>,
-        pub missing_objects_history: Vec<i64>,  // Historical missing objects counts
-        pub excess_objects_history: Vec<i64>,   // Historical excess objects counts
-        pub incoming_rate: Option<f64>,     // Objects per second (incoming)
-        pub outgoing_rate: Option<f64>,     // Objects per second (outgoing)
+        pub missing_objects_history: Vec<i64>, // Historical missing objects counts
+        pub excess_objects_history: Vec<i64>,  // Historical excess objects counts
+        pub incoming_rate: Option<f64>,        // Objects per second (incoming)
+        pub outgoing_rate: Option<f64>,        // Objects per second (outgoing)
     }
 
     #[derive(Debug, Default, Clone)]
@@ -314,11 +314,11 @@ pub mod common {
         pub pgid: String,
         pub num_objects: i64,
         pub primary_osd: u32,
-        pub up_osds: Vec<u32>,           // All OSDs in up set
+        pub up_osds: Vec<u32>, // All OSDs in up set
         pub state: String,
         pub objects_scrubbed: u64,
-        pub scrubbed_history: Vec<u64>,  // Historical scrubbed counts
-        pub scrub_rate: Option<f64>,     // Objects per second
-        pub eta_seconds: Option<u64>,    // Estimated seconds to completion
+        pub scrubbed_history: Vec<u64>, // Historical scrubbed counts
+        pub scrub_rate: Option<f64>,    // Objects per second
+        pub eta_seconds: Option<u64>,   // Estimated seconds to completion
     }
 }

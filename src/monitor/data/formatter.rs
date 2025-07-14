@@ -14,15 +14,25 @@ pub fn format_time(seconds: u64) -> String {
     } else if seconds < 3600 {
         format!("{}m{:02}s", seconds / 60, seconds % 60)
     } else if seconds < 86400 {
-        format!("{}h{:02}m{:02}s", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+        format!(
+            "{}h{:02}m{:02}s",
+            seconds / 3600,
+            (seconds % 3600) / 60,
+            seconds % 60
+        )
     } else {
-        format!("{}d{:02}h{:02}m", seconds / 86400, (seconds % 86400) / 3600, (seconds % 3600) / 60)
+        format!(
+            "{}d{:02}h{:02}m",
+            seconds / 86400,
+            (seconds % 86400) / 3600,
+            (seconds % 3600) / 60
+        )
     }
 }
 
 pub fn format_bytes_per_second(bytes_per_second: f64) -> String {
     let abs_rate = bytes_per_second.abs();
-    
+
     if abs_rate < 1024.0 {
         format!("{bytes_per_second:.0}B/s")
     } else if abs_rate < 1024.0 * 1024.0 {

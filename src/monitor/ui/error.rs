@@ -12,12 +12,20 @@ pub fn render_error(f: &mut Frame, area: Rect, error: &str, use_colors: bool) {
         .border_type(BorderType::Rounded)
         .title("ERROR")
         .title_style(Style::default().add_modifier(Modifier::BOLD))
-        .border_style(if use_colors { Style::default().fg(Color::Red) } else { Style::default() });
-    
+        .border_style(if use_colors {
+            Style::default().fg(Color::Red)
+        } else {
+            Style::default()
+        });
+
     let error_text = Paragraph::new(Text::from(error))
         .block(error_block)
-        .style(if use_colors { Style::default().fg(Color::Red) } else { Style::default() })
+        .style(if use_colors {
+            Style::default().fg(Color::Red)
+        } else {
+            Style::default()
+        })
         .wrap(Wrap { trim: true });
-    
+
     f.render_widget(error_text, area);
 }
