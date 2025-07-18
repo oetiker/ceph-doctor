@@ -48,6 +48,45 @@ impl TerminalManager {
         }
     }
 
+    pub fn should_close_popup(&self, event: &Event) -> bool {
+        match event {
+            Event::Key(key) => matches!(
+                key,
+                KeyEvent {
+                    code: KeyCode::Esc | KeyCode::Enter | KeyCode::Char(' '),
+                    ..
+                }
+            ),
+            _ => false,
+        }
+    }
+    
+    pub fn is_scroll_up(&self, event: &Event) -> bool {
+        match event {
+            Event::Key(key) => matches!(
+                key,
+                KeyEvent {
+                    code: KeyCode::Up | KeyCode::Char('k'),
+                    ..
+                }
+            ),
+            _ => false,
+        }
+    }
+    
+    pub fn is_scroll_down(&self, event: &Event) -> bool {
+        match event {
+            Event::Key(key) => matches!(
+                key,
+                KeyEvent {
+                    code: KeyCode::Down | KeyCode::Char('j'),
+                    ..
+                }
+            ),
+            _ => false,
+        }
+    }
+
     pub fn is_quit_key(&self, key: &KeyEvent) -> bool {
         matches!(
             key,
@@ -90,6 +129,16 @@ pub async fn sleep_with_event_check(
             if matches!(event, Event::Resize(_, _)) {
                 return Ok(SleepResult::Resize);
             }
+            // Handle popup events during sleep
+            if terminal_manager.should_close_popup(&event) {
+                return Ok(SleepResult::PopupClose);
+            }
+            if terminal_manager.is_scroll_up(&event) {
+                return Ok(SleepResult::PopupScrollUp);
+            }
+            if terminal_manager.is_scroll_down(&event) {
+                return Ok(SleepResult::PopupScrollDown);
+            }
         }
     }
     Ok(SleepResult::Continue)
@@ -100,4 +149,7 @@ pub enum SleepResult {
     Continue,
     Quit,
     Resize,
+    PopupClose,
+    PopupScrollUp,
+    PopupScrollDown,
 }

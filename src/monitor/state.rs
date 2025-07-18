@@ -7,11 +7,21 @@ pub struct RecoveryData {
     pub bytes: i64,
 }
 
+#[derive(Debug, Clone)]
+pub struct CommandError {
+    pub command: String,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+    pub scroll_offset: u16,
+}
+
 #[derive(Debug, Default)]
 pub struct MonitorState {
     recovery_history: HashMap<String, Vec<RecoveryData>>,
     osd_movements: HashMap<u32, OsdDataMovement>,
     inconsistent_pg_progress: HashMap<String, InconsistentPgProgress>,
+    command_error_popup: Option<CommandError>,
 }
 
 impl MonitorState {
@@ -76,5 +86,33 @@ impl MonitorState {
 
     pub fn clear_inconsistent_pg_progress(&mut self) {
         self.inconsistent_pg_progress.clear();
+    }
+
+    pub fn get_command_error_popup(&self) -> Option<&CommandError> {
+        self.command_error_popup.as_ref()
+    }
+
+    pub fn set_command_error_popup(&mut self, error: CommandError) {
+        self.command_error_popup = Some(error);
+    }
+
+    pub fn clear_command_error_popup(&mut self) {
+        self.command_error_popup = None;
+    }
+
+    pub fn has_command_error_popup(&self) -> bool {
+        self.command_error_popup.is_some()
+    }
+    
+    pub fn scroll_popup_up(&mut self) {
+        if let Some(error) = &mut self.command_error_popup {
+            error.scroll_offset = error.scroll_offset.saturating_sub(1);
+        }
+    }
+    
+    pub fn scroll_popup_down(&mut self) {
+        if let Some(error) = &mut self.command_error_popup {
+            error.scroll_offset = error.scroll_offset.saturating_add(1);
+        }
     }
 }

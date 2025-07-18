@@ -17,11 +17,9 @@ The `ceph-doctor` tool has a `monitor` subcommand that displays a real-time view
 
 Invoked via `ceph-doctor monitor`, this tool shows how Ceph is working towards resolving the `HEALTH_WARN` state. It calls `ceph pg dump --format json-pretty` at a configurable interval to observe what the cluster is doing and how fast it is doing it. For remote execution, use `--prefix-command` (e.g., `--prefix-command "ssh host sudo"`).
 
-There is also a test mode, invoked with `ceph-doctor monitor --test`, which uses the `state-a.json` and `state-b.json` files to simulate the output of the `ceph` command.
-
 ### Data Structure
 
-The JSON files contain Ceph cluster state with the following key components:
+The tool processes JSON output from Ceph containing cluster state with the following key components:
 
 - `pg_ready`: Boolean indicating if placement groups are ready
 - `pg_map`: Contains comprehensive cluster state including:
@@ -32,13 +30,7 @@ The JSON files contain Ceph cluster state with the following key components:
 
 ### Working with the Data
 
-The JSON files are large (6.8MB each) and contain single-line JSON. The tool parses this JSON to display a summary of the cluster's state.
-
-### File Format
-
-- `state-a.json` and `state-b.json`: Single-line JSON files containing complete Ceph cluster state snapshots.
-- Both files follow the same schema structure.
-- The files appear to be different time snapshots of the same cluster for comparison analysis.
+The JSON output from `ceph pg dump --format json-pretty` can be large and contains single-line JSON. The tool parses this JSON to display a summary of the cluster's state.
 
 ## Implementation
 

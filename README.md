@@ -33,7 +33,6 @@ The monitor tool calls `ceph pg dump --format json-pretty` at a configurable int
 #### Options
 
 - `--interval <SECONDS>`: Set the refresh interval (default: 5)
-- `--test`: Test mode using sample JSON files (`state-a.json` and `state-b.json`)
 - `--prefix-command <COMMAND>`: Command prefix for remote execution
 
 #### Remote Execution
@@ -54,13 +53,6 @@ ceph-doctor monitor --prefix-command "kubectl exec ceph-pod --"
 ceph-doctor monitor --prefix-command "docker exec ceph-container"
 ```
 
-#### Test Mode
-
-Test the interface using sample data:
-
-```bash
-ceph-doctor monitor --test
-```
 
 ## Features
 
@@ -128,9 +120,9 @@ Run the full test suite:
 cargo test-all
 ```
 
-Test the monitor interface locally:
+Test the monitor interface with a live cluster:
 ```bash
-cargo run -- monitor --test
+cargo run -- monitor
 ```
 
 ### Cross-compilation

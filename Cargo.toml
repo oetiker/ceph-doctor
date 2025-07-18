@@ -2,6 +2,7 @@
 name = "ceph-doctor"
 version = "0.0.1"
 edition = "2021"
+default-run = "ceph-doctor"
 
 [lints.clippy]
 uninlined_format_args = "deny"
