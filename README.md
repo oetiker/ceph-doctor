@@ -8,6 +8,12 @@ The `ceph-doctor` tool provides a `monitor` subcommand that displays a real-time
 
 ## Installation
 
+Pre-compiled binaries for common platforms (Linux AMD64 & ARM64) are available on the [GitHub Releases page](https://github.com/oetiker/ceph-doctor/releases/). Download the latest release for your architecture, make it executable, and move it to a directory in your `$PATH`.
+
+### Building from Source
+
+If you want to build from source, or if there isn't a binary for your platform, you can compile `ceph-doctor` yourself. You'll need a recent Rust toolchain.
+
 ```bash
 cargo build --release
 ```
