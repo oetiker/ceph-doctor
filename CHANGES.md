@@ -8,12 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### New
+
+### Changed
+
+### Fixed
+
+## 0.1.0 - 2025-07-18
+### New
 - **Enhanced Error Handling**: Added comprehensive error popup system that displays detailed information when ceph commands fail. The popup shows the exact command that failed, exit code, and complete output (stdout/stderr), making it much easier to diagnose connectivity, authentication, or configuration issues.
 - **Scrollable Error Messages**: Long error messages can now be scrolled using arrow keys (↑/↓) or vim-style navigation (k/j), ensuring all error details are accessible regardless of terminal size.
-
-### Improved
-- **Startup Experience**: Eliminated black screen on startup by displaying an immediate loading screen that shows the current command being executed, providing clear feedback during initial data fetch.
-- **User Interface**: Redesigned error displays with a cleaner, more professional appearance and better visual hierarchy.
 
 ### Fixed
 - **Loading Screen Freeze**: Fixed issue where application would get stuck on loading screen when ceph commands failed, leaving users with no indication of what went wrong.
