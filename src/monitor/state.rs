@@ -103,13 +103,13 @@ impl MonitorState {
     pub fn has_command_error_popup(&self) -> bool {
         self.command_error_popup.is_some()
     }
-    
+
     pub fn scroll_popup_up(&mut self) {
         if let Some(error) = &mut self.command_error_popup {
             error.scroll_offset = error.scroll_offset.saturating_sub(1);
         }
     }
-    
+
     pub fn scroll_popup_down(&mut self) {
         if let Some(error) = &mut self.command_error_popup {
             error.scroll_offset = error.scroll_offset.saturating_add(1);

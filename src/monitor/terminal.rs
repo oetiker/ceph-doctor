@@ -60,7 +60,7 @@ impl TerminalManager {
             _ => false,
         }
     }
-    
+
     pub fn is_scroll_up(&self, event: &Event) -> bool {
         match event {
             Event::Key(key) => matches!(
@@ -73,7 +73,7 @@ impl TerminalManager {
             _ => false,
         }
     }
-    
+
     pub fn is_scroll_down(&self, event: &Event) -> bool {
         match event {
             Event::Key(key) => matches!(
