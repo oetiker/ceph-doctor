@@ -9,7 +9,8 @@ The `ceph-doctor` tool provides a `monitor` subcommand that displays a real-time
 ## Demo
 
 ### OSD Data Migration
-After smart alerted on bad blocks on two disks we are going to replace them.
+
+After smartd alerted on bad blocks on two disks we are going to replace them.
 We ran:
 
 ```console
