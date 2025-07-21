@@ -6,6 +6,47 @@ A Ceph cluster analysis tool for helping with clusters where `ceph -s` shows `HE
 
 The `ceph-doctor` tool provides a `monitor` subcommand that displays a real-time view of the cluster's state, showing how Ceph is working towards resolving the `HEALTH_WARN` condition.
 
+## Demo
+
+### OSD Data Migration
+After smart alerted on bad blocks on two disks we are going to replace them.
+We ran:
+
+```console
+ceph osd out osd.43
+ceph osd out osd.46
+```
+
+Now the doctor shows how data is moving away from the 43 and 46 into many
+other disks.
+
+![Screenshot of OSD Data Migration](./screenshots/2025-07-21_08-05-remapped.png)
+
+### Inconsistant Placementgroup
+
+During scrub, ceph detected an inconsistant placement group. Unfortunately
+ceph does not see this a overly problematic, and does not take to repairing
+the inconsistency immediagely but rather works on the other scrubbing jobs.
+
+![Screenshot of Inconsitant Placement Group](./screenshots/2025-07-20_09-06-inconsistant.png)
+
+Since we want to see ceph working on a fix, we stop the ongoing scrubbing.
+
+```console
+ceph osd set noscrub
+ceph osd set nodeep-scrub
+```
+
+![Screenshot of Repair in !Progress](./screenshots/2025-07-20_09-07-repairing.png)
+
+Now ceph starts with the fixing and we can trun the scrubbing back on.
+(Maybe some ceph guru can tell us how to get this behavior automatically)
+
+```console
+ceph osd unset noscrub
+ceph osd unset nodeep-scrub
+```
+
 ## Installation
 
 Pre-compiled binaries for common platforms (Linux AMD64 & ARM64) are available on the [GitHub Releases page](https://github.com/oetiker/ceph-doctor/releases/). Download the latest release for your architecture, make it executable, and move it to a directory in your `$PATH`.
