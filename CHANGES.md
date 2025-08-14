@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+
+### Fixed
+
+## 0.1.1 - 2025-08-14
+### Changed
 - **Improved Ceph Compatibility**: Made JSON deserialization more resilient by marking unused fields as optional with `#[serde(default)]`. The tool now only requires fields that are actually used in the monitoring logic, making it forward-compatible with future Ceph versions.
 
 ### Fixed
