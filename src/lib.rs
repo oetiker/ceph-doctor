@@ -7,79 +7,134 @@ pub mod common {
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct CephPgDump {
+        #[serde(default)]
         pub pg_ready: bool,
         pub pg_map: PgMap,
     }
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct PgMap {
+        #[serde(default)]
         pub version: u64,
         pub stamp: String,
+        #[serde(default)]
         pub last_osdmap_epoch: u64,
+        #[serde(default)]
         pub last_pg_scan: u64,
         pub pg_stats: Vec<PgStats>,
         pub pg_stats_sum: PgStatsSum,
+        #[serde(default)]
         pub pg_stats_delta: PgStatsDelta,
         pub osd_stats: Vec<OsdStats>,
+        #[serde(default)]
         pub osd_stats_sum: OsdStatsSum,
+        #[serde(default)]
         pub pool_stats: Vec<PoolStats>,
+        #[serde(default)]
         pub pool_statfs: Vec<PoolStatfs>,
     }
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct PgStats {
         pub pgid: String,
+        #[serde(default)]
         pub version: String,
+        #[serde(default)]
         pub reported_seq: u64,
+        #[serde(default)]
         pub reported_epoch: u64,
         pub state: String,
+        #[serde(default)]
         pub last_fresh: String,
+        #[serde(default)]
         pub last_change: String,
+        #[serde(default)]
         pub last_active: String,
+        #[serde(default)]
         pub last_peered: String,
+        #[serde(default)]
         pub last_clean: String,
+        #[serde(default)]
         pub last_became_active: Option<String>,
+        #[serde(default)]
         pub last_became_peered: Option<String>,
+        #[serde(default)]
         pub last_unstale: Option<String>,
+        #[serde(default)]
         pub last_undegraded: Option<String>,
+        #[serde(default)]
         pub last_fullsized: Option<String>,
+        #[serde(default)]
         pub mapping_epoch: u64,
+        #[serde(default)]
         pub log_start: String,
+        #[serde(default)]
         pub ondisk_log_start: String,
+        #[serde(default)]
         pub created: u64,
+        #[serde(default)]
         pub last_epoch_clean: u64,
+        #[serde(default)]
         pub parent: String,
+        #[serde(default)]
         pub parent_split_bits: u32,
+        #[serde(default)]
         pub last_scrub: Option<String>,
+        #[serde(default)]
         pub last_scrub_stamp: Option<String>,
+        #[serde(default)]
         pub last_deep_scrub: Option<String>,
+        #[serde(default)]
         pub last_deep_scrub_stamp: Option<String>,
+        #[serde(default)]
         pub last_clean_scrub_stamp: Option<String>,
+        #[serde(default)]
         pub objects_scrubbed: Option<u64>,
+        #[serde(default)]
         pub log_size: u64,
+        #[serde(default)]
         pub log_dups_size: Option<u64>,
+        #[serde(default)]
         pub ondisk_log_size: u64,
+        #[serde(default)]
         pub stats_invalid: bool,
+        #[serde(default)]
         pub dirty_stats_invalid: bool,
+        #[serde(default)]
         pub omap_stats_invalid: bool,
+        #[serde(default)]
         pub hitset_stats_invalid: bool,
+        #[serde(default)]
         pub hitset_bytes_stats_invalid: bool,
+        #[serde(default)]
         pub pin_stats_invalid: bool,
+        #[serde(default)]
         pub manifest_stats_invalid: bool,
+        #[serde(default)]
         pub snaptrimq_len: Option<u64>,
+        #[serde(default)]
         pub last_scrub_duration: Option<u64>,
+        #[serde(default)]
         pub scrub_schedule: Option<String>,
+        #[serde(default)]
         pub scrub_duration: Option<f64>,
+        #[serde(default)]
         pub objects_trimmed: Option<u64>,
+        #[serde(default)]
         pub snaptrim_duration: Option<f64>,
         pub stat_sum: StatSum,
         pub up: Vec<u32>,
         pub acting: Vec<u32>,
+        #[serde(default)]
         pub avail_no_missing: Vec<serde_json::Value>,
+        #[serde(default)]
         pub object_location_counts: Vec<serde_json::Value>,
+        #[serde(default)]
         pub blocked_by: Vec<serde_json::Value>,
         pub up_primary: u32,
+        #[serde(default)]
         pub acting_primary: u32,
+        #[serde(default)]
         pub purged_snaps: Vec<serde_json::Value>,
     }
 
@@ -88,7 +143,7 @@ pub mod common {
         pub stat_sum: StatSum,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct PgStatsDelta {
         pub stat_sum: StatSum,
         pub store_stats: Statfs,
@@ -100,74 +155,125 @@ pub mod common {
         pub stamp_delta: String,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct StatSum {
         pub num_bytes: i64,
         pub num_objects: i64,
+        #[serde(default)]
         pub num_object_clones: i64,
         pub num_object_copies: i64,
+        #[serde(default)]
         pub num_objects_missing_on_primary: i64,
         pub num_objects_missing: i64,
         pub num_objects_degraded: i64,
         pub num_objects_misplaced: i64,
         pub num_objects_unfound: i64,
+        #[serde(default)]
         pub num_objects_dirty: i64,
+        #[serde(default)]
         pub num_whiteouts: i64,
+        #[serde(default)]
         pub num_read: i64,
+        #[serde(default)]
         pub num_read_kb: i64,
+        #[serde(default)]
         pub num_write: i64,
+        #[serde(default)]
         pub num_write_kb: i64,
+        #[serde(default)]
         pub num_scrub_errors: i64,
+        #[serde(default)]
         pub num_shallow_scrub_errors: i64,
+        #[serde(default)]
         pub num_deep_scrub_errors: i64,
+        #[serde(default)]
         pub num_objects_recovered: i64,
+        #[serde(default)]
         pub num_bytes_recovered: i64,
+        #[serde(default)]
         pub num_keys_recovered: i64,
+        #[serde(default)]
         pub num_objects_omap: i64,
+        #[serde(default)]
         pub num_objects_hit_set_archive: i64,
+        #[serde(default)]
         pub num_bytes_hit_set_archive: i64,
+        #[serde(default)]
         pub num_flush: i64,
+        #[serde(default)]
         pub num_flush_kb: i64,
+        #[serde(default)]
         pub num_evict: i64,
+        #[serde(default)]
         pub num_evict_kb: i64,
+        #[serde(default)]
         pub num_promote: i64,
+        #[serde(default)]
         pub num_flush_mode_high: i64,
+        #[serde(default)]
         pub num_flush_mode_low: i64,
+        #[serde(default)]
         pub num_evict_mode_some: i64,
+        #[serde(default)]
         pub num_evict_mode_full: i64,
+        #[serde(default)]
         pub num_objects_pinned: i64,
+        #[serde(default)]
         pub num_legacy_snapsets: i64,
+        #[serde(default)]
         pub num_large_omap_objects: i64,
+        #[serde(default)]
         pub num_objects_manifest: i64,
+        #[serde(default)]
         pub num_omap_bytes: i64,
+        #[serde(default)]
         pub num_omap_keys: i64,
+        #[serde(default)]
         pub num_objects_repaired: i64,
     }
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct OsdStats {
         pub osd: u32,
+        #[serde(default)]
         pub up_from: u64,
+        #[serde(default)]
         pub seq: u64,
+        #[serde(default)]
         pub num_pgs: u64,
+        #[serde(default)]
         pub kb: u64,
+        #[serde(default)]
         pub kb_used: u64,
+        #[serde(default)]
         pub kb_used_data: u64,
+        #[serde(default)]
         pub kb_used_omap: u64,
+        #[serde(default)]
         pub kb_used_meta: u64,
+        #[serde(default)]
         pub kb_avail: u64,
+        #[serde(default)]
         pub statfs: Statfs,
+        #[serde(default)]
         pub hb_peers: Vec<u32>,
+        #[serde(default)]
         pub snap_trim_queue_len: u64,
+        #[serde(default)]
         pub num_snap_trimming: u64,
+        #[serde(default)]
         pub num_shards_repaired: u64,
+        #[serde(default)]
         pub op_queue_age_hist: OpQueueAgeHist,
+        #[serde(default)]
         pub perf_stat: PerfStat,
+        #[serde(default)]
         pub alerts: Vec<String>,
-        pub network_ping_times: Vec<NetworkPingTime>,
+        #[serde(default)]
+        pub network_ping_times: Option<Vec<NetworkPingTime>>,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct OsdStatsSum {
         pub up_from: u64,
         pub seq: u64,
@@ -191,7 +297,7 @@ pub mod common {
         pub alerts: Vec<String>,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct Statfs {
         pub total: u64,
         pub available: u64,
@@ -205,7 +311,7 @@ pub mod common {
         pub internal_metadata: u64,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct PoolStats {
         pub poolid: u32,
         pub num_pg: u32,
@@ -217,7 +323,7 @@ pub mod common {
         pub acting: u32,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct PoolStatfs {
         pub poolid: u32,
         pub osd: u32,
@@ -276,13 +382,13 @@ pub mod common {
         pub fifteen_min: f64,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct OpQueueAgeHist {
         pub histogram: Vec<serde_json::Value>,
         pub upper_bound: u64,
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     pub struct PerfStat {
         pub commit_latency_ms: f64,
         pub apply_latency_ms: f64,

@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+- **Improved Ceph Compatibility**: Made JSON deserialization more resilient by marking unused fields as optional with `#[serde(default)]`. The tool now only requires fields that are actually used in the monitoring logic, making it forward-compatible with future Ceph versions.
 
 ### Fixed
+- **Ceph 19 Compatibility**: Fixed JSON parsing error caused by missing `network_ping_times` field in Ceph 19 output. The field (and many other unused fields) are now optional, preventing deserialization failures when Ceph's JSON structure changes.
 
 ## 0.1.0 - 2025-07-18
 ### New
